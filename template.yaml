@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Lambda function for creating ABC custom line items to distribute RI/SP benefits
+Description: Lambda function for creating ABC custom line items to distribute SP/RI benefits
 Parameters:
   pLambdaScheduleExpression:
     Type: String
