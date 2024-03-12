@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda function for creating ABC custom line items to distribute RI/SP benefits
+Parameters:
+  pLambdaScheduleExpression:
+    Type: String
+    Description: Schedule expression for the Lambda function
+    # fifth day of every month
+    Default: cron(0 0 5 * ? *)
+Globals:
+  Function:
+    Timeout: 900
+    MemorySize: 128
+    LoggingConfig:
+      LogFormat: JSON
+Resources:
+  rLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: sam_sp_ri_utility/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - arm64
+      Events:
+        ScheduledEvent:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: !Ref pLambdaScheduleExpression
+            ScheduleExpressionTimezone: UTC
+      Environment:
+        Variables:
+          # change this value to something else to write the custom line items to Billing Conductor
+          DRY_RUN: Enabled
+          # Savings Plans benefits are only distributed to EC2 by default
+          INCLUDE_FARGATE_FOR_SAVINGS_PLANS: Disabled
+          INCLUDE_LAMBDA_FOR_SAVINGS_PLANS: Disabled
+      Policies:
+        - Statement:
+            - Sid: BillingConductorAndCostExplorer
+              Effect: Allow
+              Action:
+                - billingconductor:ListAccountAssociations
+                - billingconductor:CreateCustomLineItem
+                - ce:GetCostAndUsage
+                - ce:GetReservationUtilization
+                - ce:GetSavingsPlansUtilizationDetails
+                - organizations:ListAccounts
+              Resource:
+                - '*'
+        - Statement:
+            - Sid: SNSPublishToFailureTopic
+              Effect: Allow
+              Action:
+                - sns:Publish
+              Resource:
+                - !Ref rLambdaFailureTopic
+  rLambdaFailureTopic:
+    Type: AWS::SNS::Topic
+  rEventInvokeConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Properties:
+      DestinationConfig:
+        OnFailure:
+          Destination: !Ref rLambdaFailureTopic
+      FunctionName: !Ref rLambdaFunction
+      Qualifier: $LATEST
