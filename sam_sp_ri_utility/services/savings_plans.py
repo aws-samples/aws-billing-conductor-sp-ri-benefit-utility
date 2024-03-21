@@ -74,7 +74,7 @@ def create_savings_plans_custom_line_items(inclusive_start_billing_period, exclu
                 charge_type = 'Credit' if account_benefit >= 0 else 'Fee'
                 new_custom_line_item = {
                     'Name': f'SavingsPlan-{savings_plan_guid}-Account-{account.get("AccountId")}-Benefit-{start_date_string}',
-                    'Description': f'{charge_type} from {savings_plan.get("SavingsPlanArn")} for {account.get("AccountName")} based on {round(running_hour_percentage * 100, 2)}% of normalized hours for {compute_description_text.rstrip(', ')}',
+                    'Description': f'{charge_type} from {savings_plan.get("SavingsPlanArn")} for {account.get("AccountName")} based on {round(running_hour_percentage * 100, 2)}% of normalized hours for {compute_description_text.rstrip(", ")}',
                     'BillingGroupArn': account.get('BillingGroupArn'),
                     'BillingPeriodRange': {'InclusiveStartBillingPeriod': inclusive_start_billing_period_string,
                                            'ExclusiveEndBillingPeriod': exclusive_end_billing_period_string},
