@@ -33,7 +33,7 @@ This utility shows how ABC custom line items can be used to distribute the benef
 ![architecture-diagram.png](architecture-diagram.png)
 
 The core functionality resides in a Lambda function built using [AWS Serverless Application Model (SAM)](https://aws.amazon.com/serverless/sam/). The infrastructure is defined using a CloudFormation template with the following resources **intended to be deployed in the payer account**:
-- Lambda function using Python 3.12 
+- Lambda function using Python 3.12 (the code is also unit tested against 3.9, 3.10, and 3.11) 
 - EventBridge rule using a `cron` expression to trigger on the fifth day of every month (i.e., so that the bill for the previous month is finalized)
 - An SNS topic to subscribe to on errors
 - An IAM policy and execution role with the minimum required permissions
