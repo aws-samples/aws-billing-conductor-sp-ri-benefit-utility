@@ -2,7 +2,7 @@ from .usage import *
 
 
 def create_reserved_instances_custom_line_items(inclusive_start_billing_period, exclusive_end_billing_period,
-                                                is_dry_run=True):
+                                                is_dry_run=True, target_reserved_instance_sub_ids_comma_separated = '*'):
     start_date_string = inclusive_start_billing_period.strftime('%Y-%m-%d')
     end_date_string = exclusive_end_billing_period.strftime('%Y-%m-%d')
     inclusive_start_billing_period_string = inclusive_start_billing_period.strftime(
@@ -26,9 +26,16 @@ def create_reserved_instances_custom_line_items(inclusive_start_billing_period, 
     filter = {'Dimensions': {'Key': 'SERVICE', 'Values': [
         'Amazon Relational Database Service']}}
     group_by = [{'Type': 'DIMENSION', 'Key': 'SUBSCRIPTION_ID'}]
+
+    
+    if target_reserved_instance_sub_ids_comma_separated != '*':
+        target_reserved_instance_sub_ids_list = target_reserved_instance_sub_ids_comma_separated.split(',')
+        sub_ids_filter = {'Dimensions': {'Key': 'SUBSCRIPTION_ID', 'Values': target_reserved_instance_sub_ids_list}}
+        filter = {'And': [filter, sub_ids_filter]}
+    
     rds_reserved_instances_details = \
-        cost_explorer_client.get_reservation_utilization(Filter=filter, TimePeriod=time_period, GroupBy=group_by).get(
-            'UtilizationsByTime', [])[0].get('Groups', [])
+            cost_explorer_client.get_reservation_utilization(Filter=filter, TimePeriod=time_period, GroupBy=group_by).get('UtilizationsByTime', [])[0].get('Groups', [])
+
     # by default this uses the current billing period
     # since the line items are applied for the previous month, use the inclusive start billing period
     # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/billingconductor/client/list_account_associations.html
@@ -52,11 +59,10 @@ def create_reserved_instances_custom_line_items(inclusive_start_billing_period, 
             # https://docs.aws.amazon.com/billingconductor/latest/userguide/best-practices.html#bp-dataset
             if reserved_instance_account_id not in [billing_group_account['AccountId'] for billing_group_account in
                                                     eligible_linked_accounts]:
-                reserved_instance_id = reserved_instance.get(
-                    'Attributes').get('reservationARN').split(':')[-1]
+                reserved_instance_id = reserved_instance.get('Attributes').get('reservationARN').split(':')[-1]
                 rds_running_hour_percentage = Decimal(
                     normalized_instance_hours_by_account.get(account.get('AccountId'),
-                                                             Decimal(0.0))) / total_eligible_rds_running_hours
+                                                            Decimal(0.0))) / total_eligible_rds_running_hours
                 account_benefit = Decimal(
                     reserved_instance.get('Utilization').get('NetRISavings')) * rds_running_hour_percentage
                 charge_type = 'Credit' if account_benefit >= 0 else 'Fee'
@@ -65,7 +71,7 @@ def create_reserved_instances_custom_line_items(inclusive_start_billing_period, 
                     'Description': f'{charge_type} from {reserved_instance.get("Attributes").get("reservationARN")} for {account.get("AccountId")} based on {round(rds_running_hour_percentage * 100, 2)}% of RDS normalized instance hours',
                     'BillingGroupArn': account.get('BillingGroupArn'),
                     'BillingPeriodRange': {'InclusiveStartBillingPeriod': inclusive_start_billing_period_string,
-                                           'ExclusiveEndBillingPeriod': exclusive_end_billing_period_string},
+                                        'ExclusiveEndBillingPeriod': exclusive_end_billing_period_string},
                     'ChargeDetails': {
                         # if the commitment has negative savings, distribute the charges as a fee
                         'Flat': {'ChargeValue': float(abs(account_benefit))},

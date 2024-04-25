@@ -35,6 +35,8 @@ Resources:
           # Savings Plans benefits are only distributed to EC2 by default
           INCLUDE_FARGATE_FOR_SAVINGS_PLANS: Disabled
           INCLUDE_LAMBDA_FOR_SAVINGS_PLANS: Disabled
+          TARGET_SAVINGS_PLANS_ARNS_COMMA_SEPARATED: '*'
+          TARGET_RESERVED_INSTANCE_SUB_IDS_COMMA_SEPARATED: '*'
       Policies:
         - Statement:
             - Sid: BillingConductorAndCostExplorer

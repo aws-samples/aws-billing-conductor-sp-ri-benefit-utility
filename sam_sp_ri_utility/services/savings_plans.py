@@ -3,7 +3,7 @@ from .usage import *
 
 def create_savings_plans_custom_line_items(inclusive_start_billing_period, exclusive_end_billing_period,
                                            is_dry_run=True, include_fargate_for_savings_plans=False,
-                                           include_lambda_for_savings_plans=False):
+                                           include_lambda_for_savings_plans=False, target_savings_plans_arns_comma_separated = '*'):
     start_date_string = inclusive_start_billing_period.strftime('%Y-%m-%d')
     end_date_string = exclusive_end_billing_period.strftime('%Y-%m-%d')
     inclusive_start_billing_period_string = inclusive_start_billing_period.strftime(
@@ -16,8 +16,17 @@ def create_savings_plans_custom_line_items(inclusive_start_billing_period, exclu
     # note that end date is exclusive
     # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ce/client/get_savings_plans_utilization_details.html
     time_period = {'Start': start_date_string, 'End': end_date_string}
-    savings_plans_details = cost_explorer_client.get_savings_plans_utilization_details(TimePeriod=time_period).get(
+
+    if target_savings_plans_arns_comma_separated == '*':
+        savings_plans_details = cost_explorer_client.get_savings_plans_utilization_details(TimePeriod=time_period).get(
         'SavingsPlansUtilizationDetails', [])
+    else:
+        target_savings_plan_arn_list = target_savings_plans_arns_comma_separated.split(',')
+        filter = {'Dimensions': {'Key': 'SAVINGS_PLAN_ARN', 'Values': target_savings_plan_arn_list}}
+        savings_plans_details = cost_explorer_client.get_savings_plans_utilization_details(TimePeriod=time_period, Filter=filter).get(
+            'SavingsPlansUtilizationDetails', [])
+        
+
     # by default this uses the current billing period
     # since the line items are applied for the previous month, use the inclusive start billing period
     # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/billingconductor/client/list_account_associations.html
@@ -58,14 +67,13 @@ def create_savings_plans_custom_line_items(inclusive_start_billing_period, exclu
                 account_id, Decimal(0.0))
     for savings_plan in savings_plans_details:
         for account in eligible_linked_accounts:
-            savings_plan_guid = savings_plan.get(
-                'SavingsPlanArn').split('/')[-1]
+            savings_plan_guid = savings_plan.get('SavingsPlanArn').split('/')[-1]
             savings_plan_account_id = savings_plan.get(
                 'Attributes').get('AccountId')
             # ignore Savings Plans purchases made in accounts that belong to a billing group since ABC processes them
             # https://docs.aws.amazon.com/billingconductor/latest/userguide/best-practices.html#bp-dataset
             if savings_plan_account_id not in [billing_group_account['AccountId'] for billing_group_account in
-                                               eligible_linked_accounts]:
+                                            eligible_linked_accounts]:
                 running_hour_percentage = Decimal(
                     normalized_hours_by_account.get(account.get('AccountId', Decimal(0.0)),
                                                     Decimal(0.0))) / total_eligible_compute_running_hours
@@ -77,7 +85,7 @@ def create_savings_plans_custom_line_items(inclusive_start_billing_period, exclu
                     'Description': f'{charge_type} from {savings_plan.get("SavingsPlanArn")} for {account.get("AccountName")} based on {round(running_hour_percentage * 100, 2)}% of normalized hours for {compute_description_text.rstrip(", ")}',
                     'BillingGroupArn': account.get('BillingGroupArn'),
                     'BillingPeriodRange': {'InclusiveStartBillingPeriod': inclusive_start_billing_period_string,
-                                           'ExclusiveEndBillingPeriod': exclusive_end_billing_period_string},
+                                        'ExclusiveEndBillingPeriod': exclusive_end_billing_period_string},
                     'ChargeDetails': {
                         # if the commitment has negative savings, distribute the charges as a fee
                         'Flat': {'ChargeValue': float(abs(account_benefit))},
