@@ -305,3 +305,65 @@ def test_create_reserved_instances_custom_line_items_for_negative_net_savings(mo
     actual = create_reserved_instances_custom_line_items(
         date(2024, 2, 1), date(2024, 3, 1), True)
     assert is_equal_list_of_dict(actual, expected)
+
+
+
+@mock.patch('boto3.client')
+@mock.patch('sam_sp_ri_utility.services.reserved_instances.get_rds_normalized_hours_by_linked_account')
+def test_create_reserved_instances_custom_line_items_for_standard_input_specify_subscription_ids(mock_rds_usage, mock_client):
+    expected = [{'Name': 'ReservedInstance-ri-2023-12-06-18-51-29-735-Account-444444444444-Benefit-2024-02-01',
+                 'Description': 'Credit from arn:aws:rds:us-west-2:789456123012:ri:ri-2023-12-06-18-51-29-735 for 444444444444 based on 74.80% of RDS normalized instance hours',
+                 'BillingGroupArn': 'arn:aws:billingconductor::789456123012:billinggroup/888888888888',
+                 'BillingPeriodRange': {'InclusiveStartBillingPeriod': '2024-02',
+                                        'ExclusiveEndBillingPeriod': '2024-03'},
+                 'ChargeDetails': {'Flat': {'ChargeValue': 2.655040550086921}, 'Type': 'CREDIT'},
+                 'AccountId': '444444444444'},
+                {'Name': 'ReservedInstance-ri-2023-12-06-18-51-29-735-Account-555555555555-Benefit-2024-02-01',
+                 'Description': 'Credit from arn:aws:rds:us-west-2:789456123012:ri:ri-2023-12-06-18-51-29-735 for 555555555555 based on 25.20% of RDS normalized instance hours',
+                 'BillingGroupArn': 'arn:aws:billingconductor::789456123012:billinggroup/999999999999',
+                 'BillingPeriodRange': {'InclusiveStartBillingPeriod': '2024-02',
+                                        'ExclusiveEndBillingPeriod': '2024-03'},
+                 'ChargeDetails': {'Flat': {'ChargeValue': 0.8945594499130791}, 'Type': 'CREDIT'},
+                 'AccountId': '555555555555'}]
+    mock_client().get_reservation_utilization.return_value = {'UtilizationsByTime': [
+        {'TimePeriod': {'Start': '2024-02-01', 'End': '2024-03-01'}, 'Groups': [
+            {'Key': 'SubscriptionId', 'Value': '14141414141',
+             'Attributes': {'accountId': '789456123012', 'accountName': 'payer', 'availabilityZone': '',
+                            'averageOnDemandHourlyRate': '0.018000000000000002',
+                            'cancellationDateTime': '2024-12-05T18:51:31.000Z', 'effectiveHourlyRate': '0.0129',
+                            'endDateTime': '2024-12-05T18:51:31.000Z', 'hourlyRecurringFee': '0.0129',
+                            'instanceFamily': '', 'instanceType': 'db.t3.micro',
+                            'leaseId': 'ri-2023-12-06-18-51-29-735', 'modificationStatus': 'Not Manual',
+                                                    'numberOfInstances': '1', 'offeringType': '', 'platform': 'PostgreSQL',
+                                                    'region': 'us-west-2',
+                                                    'reservationARN': 'arn:aws:rds:us-west-2:789456123012:ri:ri-2023-12-06-18-51-29-735',
+                                                    'scope': 'Region', 'service': 'Amazon Relational Database Service',
+                                                    'sizeFlexibility': 'FlexRI', 'startDateTime': '2023-12-06T18:51:32.000Z',
+                                                    'subscriptionId': '14141414141', 'subscriptionStatus': 'Active',
+                                                    'subscriptionType': 'No Upfront', 'tenancy': 'Shared',
+                                                    'totalAssetValue': '113.00399641666667', 'upfrontFee': '0.0'},
+             'Utilization': {'UtilizationPercentage': '100', 'PurchasedHours': '696', 'TotalActualHours': '696',
+                             'UnusedHours': '0', 'OnDemandCostOfRIHoursUsed': '12.528', 'NetRISavings': '3.5496',
+                             'TotalPotentialRISavings': '3.5496', 'AmortizedUpfrontFee': '0',
+                             'AmortizedRecurringFee': '8.9784', 'TotalAmortizedFee': '8.9784',
+                             'RICostForUnusedHours': '0', 'RealizedSavings': '3.5496', 'UnrealizedSavings': '0'}}],
+         'Total': {'UtilizationPercentage': '100', 'PurchasedHours': '2088.0', 'TotalActualHours': '2088.0',
+                   'UnusedHours': '0.0', 'OnDemandCostOfRIHoursUsed': '37.584', 'NetRISavings': '11.5780712299999995',
+                   'TotalPotentialRISavings': '11.5780712299999989', 'AmortizedUpfrontFee': '12.71232877',
+                   'AmortizedRecurringFee': '13.293599999999999', 'TotalAmortizedFee': '26.005928769999999',
+                   'RICostForUnusedHours': '0', 'RealizedSavings': '11.57807123', 'UnrealizedSavings': '0'}}],
+        'ResponseMetadata': {
+        'RequestId': '8a94e821-2206-439b-9267-3856ff64203e',
+        'HTTPStatusCode': 200, 'HTTPHeaders': {
+            'date': 'Fri, 08 Mar 2024 20:43:53 GMT',
+            'content-type': 'application/x-amz-json-1.1',
+            'content-length': '4566',
+            'connection': 'keep-alive',
+                            'x-amzn-requestid': '8a94e821-2206-439b-9267-3856ff64203e',
+                            'cache-control': 'no-cache'}, 'RetryAttempts': 0}}
+    mock_client().list_account_associations.return_value = default_account_associations_response
+    mock_rds_usage.return_value = {'555555555555': Decimal(
+        '696.0'), '444444444444': Decimal('2065.7187435')}
+    actual = create_reserved_instances_custom_line_items(
+        date(2024, 2, 1), date(2024, 3, 1), True, '14141414141')
+    assert is_equal_list_of_dict(actual, expected)

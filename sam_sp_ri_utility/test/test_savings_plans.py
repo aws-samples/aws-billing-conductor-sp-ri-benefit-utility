@@ -498,3 +498,60 @@ def test_create_savings_plans_custom_line_items_for_fargate_and_lambda_usage(moc
     actual = create_savings_plans_custom_line_items(
         date(2024, 2, 1), date(2024, 3, 1), True, True, True)
     assert is_equal_list_of_dict(actual, expected)
+
+@mock.patch('boto3.client')
+@mock.patch('sam_sp_ri_utility.services.savings_plans.get_ec2_normalized_hours_by_linked_account')
+def test_create_savings_plans_custom_line_items_for_standard_input_specify_arns(mock_ec2_usage, mock_client):
+    expected = [{'Name': 'SavingsPlan-67e19d7f-3dd7-4652-861b-a7fb6dd11892-Account-444444444444-Benefit-2024-02-01',
+                 'Description': 'Credit from arn:aws:savingsplans::789456123012:savingsplan/67e19d7f-3dd7-4652-861b-a7fb6dd11892 for Secondary Sandbox based on 38.89% of normalized hours for EC2',
+                 'BillingGroupArn': 'arn:aws:billingconductor::789456123012:billinggroup/888888888888',
+                 'BillingPeriodRange': {'InclusiveStartBillingPeriod': '2024-02',
+                                        'ExclusiveEndBillingPeriod': '2024-03'},
+                 'ChargeDetails': {'Flat': {'ChargeValue': 0.1919272702666667}, 'Type': 'CREDIT'},
+                 'AccountId': '444444444444'},
+                {'Name': 'SavingsPlan-67e19d7f-3dd7-4652-861b-a7fb6dd11892-Account-555555555555-Benefit-2024-02-01',
+                 'Description': 'Credit from arn:aws:savingsplans::789456123012:savingsplan/67e19d7f-3dd7-4652-861b-a7fb6dd11892 for General Sandbox based on 61.11% of normalized hours for EC2',
+                 'BillingGroupArn': 'arn:aws:billingconductor::789456123012:billinggroup/999999999999',
+                 'BillingPeriodRange': {'InclusiveStartBillingPeriod': '2024-02',
+                                        'ExclusiveEndBillingPeriod': '2024-03'},
+                 'ChargeDetails': {'Flat': {'ChargeValue': 0.3015999961333334}, 'Type': 'CREDIT'},
+                 'AccountId': '555555555555'}]
+    mock_client().get_savings_plans_utilization_details.return_value = {'SavingsPlansUtilizationDetails': [
+        {'SavingsPlanArn': 'arn:aws:savingsplans::789456123012:savingsplan/67e19d7f-3dd7-4652-861b-a7fb6dd11892',
+         'Attributes': {'AccountId': '789456123012', 'AccountName': 'payer',
+                        'EndDateTime': '2025-01-30T01:09:15.000Z', 'HourlyCommitment': '0.001', 'InstanceFamily': 't3a',
+                        'PaymentOption': 'All Upfront', 'PurchaseTerm': '1yr', 'RecurringHourlyFee': '0.0',
+                        'Region': 'US West (Oregon)',
+                        'SavingsPlanARN': 'arn:aws:savingsplans::789456123012:savingsplan/67e19d7f-3dd7-4652-861b-a7fb6dd11892',
+                        'SavingsPlansType': 'EC2InstanceSavingsPlans', 'StartDateTime': '2024-01-31T01:09:16.000Z',
+                                            'Status': 'Active', 'UpfrontFee': '8.76'},
+         'Utilization': {'TotalCommitment': '0.6960000000000001', 'UsedCommitment': '0.6960000000000001',
+                         'UnusedCommitment': '0.0', 'UtilizationPercentage': '100'},
+         'Savings': {'NetSavings': '0.49352726640000005', 'OnDemandCostEquivalent': '1.1895272664'},
+         'AmortizedCommitment': {'AmortizedRecurringCommitment': '0.0',
+                                 'AmortizedUpfrontCommitment': '0.6960000000000001',
+                                 'TotalAmortizedCommitment': '0.6960000000000001'}}], 'Total': {
+        'Utilization': {'TotalCommitment': '21.5760000000000001', 'UsedCommitment': '21.5760000000000001',
+                        'UnusedCommitment': '0.0', 'UtilizationPercentage': '100'},
+        'Savings': {'NetSavings': '9.75882132000000035', 'OnDemandCostEquivalent': '31.3348213200'},
+        'AmortizedCommitment': {'AmortizedRecurringCommitment': '10.42411032',
+                                'AmortizedUpfrontCommitment': '11.1518896800000001',
+                                'TotalAmortizedCommitment': '21.5760000000000001'}},
+        'TimePeriod': {'Start': '2024-02-01',
+                       'End': '2024-03-01'},
+        'ResponseMetadata': {
+        'RequestId': '8a94e821-2206-439b-9267-3856ff64203e',
+        'HTTPStatusCode': 200, 'HTTPHeaders': {
+            'date': 'Thu, 07 Mar 2024 22:44:25 GMT',
+            'content-type': 'application/x-amz-json-1.1',
+            'content-length': '4301',
+            'connection': 'keep-alive',
+                            'x-amzn-requestid': '8a94e821-2206-439b-9267-3856ff64203e',
+                            'cache-control': 'no-cache'},
+        'RetryAttempts': 0}}
+    mock_client().list_account_associations.return_value = default_account_associations_response
+    mock_ec2_usage.return_value = {'555555555555': Decimal(
+        '7656'), '444444444444': Decimal('4872')}
+    actual = create_savings_plans_custom_line_items(
+        date(2024, 2, 1), date(2024, 3, 1), True, False, False, 'arn:aws:savingsplans::789456123012:savingsplan/53e79e9c-5a3b-40ea-8096-f6876496613a')
+    assert is_equal_list_of_dict(actual, expected)
