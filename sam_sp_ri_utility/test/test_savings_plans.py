@@ -553,5 +553,5 @@ def test_create_savings_plans_custom_line_items_for_standard_input_specify_arns(
     mock_ec2_usage.return_value = {'555555555555': Decimal(
         '7656'), '444444444444': Decimal('4872')}
     actual = create_savings_plans_custom_line_items(
-        date(2024, 2, 1), date(2024, 3, 1), True, False, False, 'arn:aws:savingsplans::789456123012:savingsplan/53e79e9c-5a3b-40ea-8096-f6876496613a')
+        date(2024, 2, 1), date(2024, 3, 1), True, False, False, 'arn:aws:savingsplans::789456123012:savingsplan/67e19d7f-3dd7-4652-861b-a7fb6dd11892')
     assert is_equal_list_of_dict(actual, expected)
