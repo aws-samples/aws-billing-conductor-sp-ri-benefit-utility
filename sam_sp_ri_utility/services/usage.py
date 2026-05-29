@@ -53,10 +53,16 @@ def get_ec2_normalized_hours_by_linked_account(start_date_string, end_date_strin
         # an example usage type for unused ODCRs is USW2-UnusedBox:c6g.xlarge
         # an example usage type for an unused dedicated host is USW2-UnusedDed:c6gd.12xlarge
         if 'SpotUsage' not in usage_type and 'Unused' not in usage_type:
+            # an example usage type is USW1-BoxUsage:c5.2xlarge
+            # skip usage types that don't match the expected <prefix>:<family>.<size> pattern
+            # (e.g. Capacity Block usage like USE2-BoxUsage:DCH:p5.48xlarge, or legacy types
+            # without instance metadata) to avoid IndexError on malformed rows
+            usage_type_parts = usage_type.split(':')
+            if len(usage_type_parts) != 2 or '.' not in usage_type_parts[1]:
+                continue
             running_hours = Decimal(row.get('Metrics').get(
                 'UsageQuantity').get('Amount'))
-            # an example usage type is USW1-BoxUsage:c5.2xlarge
-            instance_size = usage_type.split(':')[1].split('.')[1]
+            instance_size = usage_type_parts[1].split('.')[1]
             normalized_instance_hours = running_hours * \
                 size_normalization_factor_map.get(instance_size, Decimal(1.0))
             if linked_account in normalized_instance_hours_by_linked_account:
@@ -139,7 +145,11 @@ def get_rds_normalized_hours_by_linked_account(start_date_string, end_date_strin
         linked_account = row.get('Keys')[0]
         usage_type = row.get('Keys')[1]
         # an example usage type is USW2-Multi-AZUsage:db.m5.xl
-        instance_size = usage_type.split(':')[1].split('.')[2]
+        # skip rows that don't match <prefix>:db.<family>.<size> to avoid IndexError
+        usage_type_parts = usage_type.split(':')
+        if len(usage_type_parts) != 2 or len(usage_type_parts[1].split('.')) < 3:
+            continue
+        instance_size = usage_type_parts[1].split('.')[2]
         # convert usage type size to size format in normalization table
         if instance_size.endswith('xl'):
             instance_size = instance_size.replace('xl', 'xlarge')
